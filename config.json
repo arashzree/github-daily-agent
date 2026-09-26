@@ -1,0 +1,9 @@
+{
+  "target_repo": "arashzree/github-daily-agent",
+  "timezone": "Asia/Tehran",
+  "ai_provider": "github_models",
+  "ai_model": "openai/gpt-4.1-mini",
+  "task_sink": "todoist",
+  "todoist_project": "Daily Agent",
+  "lookback_hours": 24
+}
