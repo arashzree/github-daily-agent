@@ -35,8 +35,8 @@ jobs:
         run: |
           start=$(date +%s)
           python3 scripts/ollama_spike.py \
-            "qwen3.5:9b,qwen3:8b" \
-            "gemma4:e4b,gemma3:4b"
+            "qwen3.5:9b" \
+            "gemma4:e4b"
           echo "total pull+inference: $(( $(date +%s) - start ))s"
 
       - name: Ollama server log
