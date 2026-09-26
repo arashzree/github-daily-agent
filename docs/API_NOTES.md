@@ -65,6 +65,12 @@ Body used:
 - Only open tasks are listed. Dedupe against completed tasks would need a
   separate endpoint (not checked yet).
 
+### DELETE /tasks/{id}
+
+`DELETE /api/v1/tasks/6hcrrJvmWFxX3v3q` → `204` with an empty body (no
+JSON to parse). After deleting both test tasks,
+`GET /tasks?project_id=...` returned `{"results": [], "next_cursor": null}`.
+
 ### Persian / UTF-8
 
 `"content": "تست فارسی"` round-trips unchanged through POST and GET. The
