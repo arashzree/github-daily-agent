@@ -1,7 +1,7 @@
 # Plan
 
 - [x] T0 — Project setup
-- [ ] T1 — API spikes (Todoist + GitHub Models)
+- [x] T1 — API spikes (Todoist + LLM → local Ollama)
 - [ ] T2 — github_client
 - [ ] T3 — ai module
 - [ ] T4 — todoist_client + dedupe
