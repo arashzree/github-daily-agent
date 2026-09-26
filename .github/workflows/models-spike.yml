@@ -4,34 +4,41 @@ on:
   workflow_dispatch:
 
 permissions:
-  models: read
+  contents: read
 
 jobs:
   spike:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      OLLAMA_MODELS: /home/runner/.ollama/models
     steps:
-      - name: Call GitHub Models
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+
+      - name: Restore model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama
+          key: ollama-${{ runner.os }}-qwen3.5-9b-gemma4-e4b-v1
+
+      - name: Install Ollama
         run: |
-          cat > body.json <<'JSON'
-          {"model":"openai/gpt-4.1-mini","temperature":0,
-           "messages":[
-            {"role":"system","content":"You turn GitHub activity into a Persian task summary. Reply with ONLY a JSON object of the form {\"done\":[string],\"remaining\":[string]}. All strings in Persian. No markdown, no code fences."},
-            {"role":"user","content":"Commits:\n- feat: add login page\n- fix: crash when config file is missing\n- docs: update README install steps\n\nOpen issues:\n- #12 Dark mode toggle does not persist\n- #15 Add CSV export for reports"}
-           ]}
-          JSON
-          curl -sS -m 120 -D headers.txt -o response.json \
-            -X POST https://models.github.ai/inference/chat/completions \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            --data-binary @body.json
-          echo "## response headers"
-          cat headers.txt
-          echo "## raw response"
-          cat response.json; echo
-          echo "## model content parsed as JSON"
-          jq -r '.choices[0].message.content' response.json | jq .
-          echo "## usage"
-          jq '.usage' response.json
+          start=$(date +%s)
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama || true
+          nohup ollama serve > ollama.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:11434/api/version && break; sleep 1; done
+          echo; echo "install+start: $(( $(date +%s) - start ))s"
+          nproc; free -h
+
+      - name: Run spike
+        run: |
+          start=$(date +%s)
+          python3 scripts/ollama_spike.py \
+            "qwen3.5:9b,qwen3:8b" \
+            "gemma4:e4b,gemma3:4b"
+          echo "total pull+inference: $(( $(date +%s) - start ))s"
+
+      - name: Ollama server log
+        if: always()
+        run: tail -n 50 ollama.log || true
