@@ -1,0 +1,37 @@
+name: models-spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  models: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call GitHub Models
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > body.json <<'JSON'
+          {"model":"openai/gpt-4.1-mini","temperature":0,
+           "messages":[
+            {"role":"system","content":"You turn GitHub activity into a Persian task summary. Reply with ONLY a JSON object of the form {\"done\":[string],\"remaining\":[string]}. All strings in Persian. No markdown, no code fences."},
+            {"role":"user","content":"Commits:\n- feat: add login page\n- fix: crash when config file is missing\n- docs: update README install steps\n\nOpen issues:\n- #12 Dark mode toggle does not persist\n- #15 Add CSV export for reports"}
+           ]}
+          JSON
+          curl -sS -m 120 -D headers.txt -o response.json \
+            -X POST https://models.github.ai/inference/chat/completions \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            --data-binary @body.json
+          echo "## response headers"
+          cat headers.txt
+          echo "## raw response"
+          cat response.json; echo
+          echo "## model content parsed as JSON"
+          jq -r '.choices[0].message.content' response.json | jq .
+          echo "## usage"
+          jq '.usage' response.json
