@@ -3,6 +3,7 @@
   "timezone": "Asia/Tehran",
   "ai_provider": "ollama",
   "ai_model": "qwen3.5:9b",
+  "output_language": "en",
   "task_sink": "todoist",
   "todoist_project": "Daily Agent",
   "lookback_hours": 24,

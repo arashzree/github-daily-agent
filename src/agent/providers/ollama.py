@@ -7,6 +7,7 @@ import logging
 
 import requests
 
+from agent.config import Language
 from agent.providers.base import (
     SUMMARY_SCHEMA,
     Activity,
@@ -25,8 +26,15 @@ NUM_CTX = 8192
 
 
 class OllamaProvider:
-    def __init__(self, model: str, base_url: str = DEFAULT_URL, session: requests.Session | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        language: Language = "en",
+        base_url: str = DEFAULT_URL,
+        session: requests.Session | None = None,
+    ) -> None:
         self.model = model
+        self.language = language
         self.base_url = base_url
         self._session = session or requests.Session()
 
@@ -37,7 +45,7 @@ class OllamaProvider:
             "think": False,
             "format": SUMMARY_SCHEMA,
             "options": {"temperature": 0, "num_ctx": NUM_CTX},
-            "messages": build_messages(activity),
+            "messages": build_messages(activity, self.language),
         }
         try:
             resp = self._session.post(f"{self.base_url}/api/chat", json=payload, timeout=TIMEOUT_SECONDS)

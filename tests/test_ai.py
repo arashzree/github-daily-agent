@@ -15,6 +15,7 @@ from agent.providers.base import (
     Summary,
     parse_summary,
     render_activity,
+    system_prompt,
 )
 from agent.providers.ollama import OllamaProvider
 
@@ -101,6 +102,17 @@ def test_raises_after_second_invalid_output() -> None:
     assert provider.calls == 2
 
 
+def test_system_prompt_language_and_style_rules() -> None:
+    en, fa = system_prompt("en"), system_prompt("fa")
+    for prompt in (en, fa):
+        assert "at most ~8 words" in prompt
+        assert "README, CI," in prompt and "dry-run, client" in prompt
+        assert "{language_rule}" not in prompt
+        assert '{"done": [string]' in prompt
+    assert "Write all text in English." in en
+    assert "Persian (Farsi), except the technical terms above" in fa
+
+
 def test_render_activity_lists_everything() -> None:
     activity = make_activity([7])
     activity.open_issues[0].body = "line one\nline two"
@@ -135,6 +147,14 @@ def test_ollama_request_and_parse() -> None:
     assert (p["model"], p["think"], p["stream"], p["options"]["temperature"]) == ("qwen3.5:9b", False, False, 0)
     assert p["format"]["required"] == ["done", "remaining"]
     assert [m["role"] for m in p["messages"]] == ["system", "user"]
+    assert "Write all text in English." in p["messages"][0]["content"]
+
+
+def test_ollama_uses_configured_language() -> None:
+    content = json.dumps({"done": [], "remaining": []})
+    session = FakePostSession(response(body={"message": {"content": content}}))
+    OllamaProvider("m", "fa", session=session).summarize(make_activity([]))  # type: ignore[arg-type]
+    assert "Persian" in session.payload["messages"][0]["content"]
 
 
 @pytest.mark.parametrize(
@@ -144,6 +164,13 @@ def test_ollama_request_and_parse() -> None:
 def test_ollama_failures_raise_ai_error(result: requests.Response | Exception) -> None:
     with pytest.raises(AIError):
         OllamaProvider("m", session=FakePostSession(result)).summarize(make_activity([]))  # type: ignore[arg-type]
+
+
+def test_make_provider_passes_language() -> None:
+    config = type("C", (), {"ai_provider": "ollama", "ai_model": "m", "output_language": "fa"})()
+    provider = ai.make_provider(config)  # type: ignore[arg-type]
+    assert isinstance(provider, OllamaProvider)
+    assert provider.language == "fa"
 
 
 def test_make_provider_rejects_unknown() -> None:

@@ -2,11 +2,14 @@
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.json"
+
+Language = Literal["en", "fa"]
 
 
 class Config(BaseModel):
@@ -18,6 +21,7 @@ class Config(BaseModel):
     timezone: str
     ai_provider: str
     ai_model: str
+    output_language: Language = "en"
     task_sink: str
     todoist_project: str
     lookback_hours: int = Field(default=24, gt=0)

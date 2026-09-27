@@ -4,6 +4,7 @@ from typing import Annotated, Any, Protocol
 
 from pydantic import BaseModel, StringConstraints, ValidationError
 
+from agent.config import Language
 from agent.github_client import Commit, Issue
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -60,17 +61,29 @@ SUMMARY_SCHEMA: dict[str, Any] = {
     "required": ["done", "remaining"],
 }
 
+LANGUAGE_RULES: dict[Language, str] = {
+    "en": "Write all text in English.",
+    "fa": "Write all text in natural, fluent Persian (Farsi), except the technical terms above.",
+}
+
 SYSTEM_PROMPT = """\
-You turn a GitHub repository's recent activity into a developer's Persian to-do list.
-Reply with ONLY a JSON object: {"done": [string], "remaining": [{"issue": int, "title": string}]}.
+You turn a GitHub repository's recent activity into a developer's to-do list.
+Reply with ONLY a JSON object: {{"done": [string], "remaining": [{{"issue": int, "title": string}}]}}.
 
 - "done": what was accomplished, based ONLY on the commits and closed issues. Merge
-  related commits into one item. Short past-tense Persian phrases, at most 10 items.
-  Empty list if there are no commits and no closed issues.
+  related commits into one item. Short past-tense phrases (at most ~8 words), at most
+  10 items. Empty list if there are no commits and no closed issues.
 - "remaining": exactly one entry per open issue, using that issue's number. "title" is a
-  short, actionable Persian task (imperative, at most 10 words) saying what to do next.
-- Write natural Persian. Keep code identifiers, file names and product names in English.
+  short imperative task (at most ~8 words) saying what to do next, e.g. "Write README
+  setup section".
+- Keep technical terms exactly as they appear, never translate them: README, CI,
+  dry-run, client, API, workflow, commit, code identifiers, file and product names.
+- {language_rule}
 - Never invent issues. No markdown, no code fences, no issue numbers inside titles."""
+
+
+def system_prompt(language: Language) -> str:
+    return SYSTEM_PROMPT.format(language_rule=LANGUAGE_RULES[language])
 
 
 def render_activity(activity: Activity) -> str:
@@ -98,9 +111,9 @@ def parse_summary(text: str) -> Summary:
         raise AIError(f"AI output doesn't match schema: {exc.error_count()} error(s); got {text[:200]!r}") from exc
 
 
-def build_messages(activity: Activity) -> list[dict[str, str]]:
+def build_messages(activity: Activity, language: Language) -> list[dict[str, str]]:
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt(language)},
         {"role": "user", "content": render_activity(activity)},
     ]
 

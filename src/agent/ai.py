@@ -13,7 +13,7 @@ MAX_ATTEMPTS = 2  # one retry on invalid output, then give up
 
 def make_provider(config: Config) -> AIProvider:
     if config.ai_provider == "ollama":
-        return OllamaProvider(config.ai_model)
+        return OllamaProvider(config.ai_model, config.output_language)
     raise ValueError(f"unknown ai_provider: {config.ai_provider!r}")
 
 
