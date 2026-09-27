@@ -10,10 +10,9 @@ import requests
 from pydantic import BaseModel
 
 from agent.config import Config, load_config, require_env
+from agent.retry import send
 
 API_URL = "https://api.github.com"
-TIMEOUT_SECONDS = 20
-MAX_TRIES = 3
 PER_PAGE = 100
 
 
@@ -88,32 +87,19 @@ class GitHubClient:
         )
 
     def _get(self, url: str, params: dict[str, Any] | None) -> requests.Response:
-        """GET with retries on timeouts, connection errors and 5xx."""
-        for attempt in range(1, MAX_TRIES + 1):
-            try:
-                resp = self._session.get(url, params=params, timeout=TIMEOUT_SECONDS)
-            except (requests.Timeout, requests.ConnectionError) as exc:
-                if attempt == MAX_TRIES:
-                    raise GitHubError(f"GitHub unreachable after {MAX_TRIES} tries: {exc}") from exc
-                self._sleep(2 ** (attempt - 1))
-                continue
-
-            status = resp.status_code
-            if status >= 500:
-                if attempt == MAX_TRIES:
-                    raise GitHubError(f"GitHub returned {status} after {MAX_TRIES} tries for {url}")
-                self._sleep(2 ** (attempt - 1))
-                continue
-            if status in (403, 429) and resp.headers.get("X-RateLimit-Remaining") == "0":
-                reset = resp.headers.get("X-RateLimit-Reset")
-                when = datetime.fromtimestamp(int(reset), UTC).isoformat() if reset else "unknown"
-                raise GitHubError(f"GitHub rate limit exhausted (resets at {when})")
-            if status in (401, 403, 404):
-                raise GitHubError(f"GitHub returned {status} for {url}: check GH_PAT / repo access")
-            if not resp.ok:
-                raise GitHubError(f"GitHub returned {status} for {url}: {resp.text[:200]}")
-            return resp
-        raise AssertionError("unreachable")
+        resp = send(
+            self._session, "GET", url, params=params, service="GitHub", error=GitHubError, sleep=self._sleep
+        )
+        status = resp.status_code
+        if status in (403, 429) and resp.headers.get("X-RateLimit-Remaining") == "0":
+            reset = resp.headers.get("X-RateLimit-Reset")
+            when = datetime.fromtimestamp(int(reset), UTC).isoformat() if reset else "unknown"
+            raise GitHubError(f"GitHub rate limit exhausted (resets at {when})")
+        if status in (401, 403, 404):
+            raise GitHubError(f"GitHub returned {status} for {url}: check GH_PAT / repo access")
+        if not resp.ok:
+            raise GitHubError(f"GitHub returned {status} for {url}: {resp.text[:200]}")
+        return resp
 
     def _paginate(self, path: str, params: dict[str, Any]) -> Iterator[dict[str, Any]]:
         """Yield items from every page, following the Link header."""
