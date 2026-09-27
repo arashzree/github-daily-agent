@@ -1,6 +1,9 @@
 name: agent
 
 on:
+  schedule:
+    # 20:00 UTC = 23:30 Asia/Tehran (UTC+3:30; Iran has no DST since 2022).
+    - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -11,10 +14,15 @@ on:
 permissions:
   contents: read
 
+# One run at a time: two overlapping runs could both create the same task.
+concurrency:
+  group: agent
+  cancel-in-progress: false
+
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -28,7 +36,10 @@ jobs:
 
       # Setup proven in the T1 spike (docs/API_NOTES.md): run `ollama serve`
       # ourselves and pull fresh every run (no cache).
+      # Step timeouts fail the step (so the failure report below runs); a job
+      # timeout would cancel the job and skip it.
       - name: Install Ollama
+        timeout-minutes: 6
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
           sudo systemctl stop ollama || true
@@ -36,14 +47,42 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:11434/api/version && break; sleep 1; done
 
       - name: Pull model
+        timeout-minutes: 5
         run: ollama pull "$(jq -r .ai_model config.json)"
 
       - name: Run agent
+        timeout-minutes: 12
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
-        run: python -m agent.main ${{ inputs.dry_run && '--dry-run' || '' }}
+          # Only the nightly schedule writes by default. A manual run writes only
+          # when dry_run is explicitly unchecked.
+          DRY_RUN: ${{ github.event_name != 'schedule' && inputs.dry_run != false }}
+        run: |
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "Mode: REAL run (writes to Todoist)"
+            python -m agent.main
+          else
+            echo "Mode: dry run"
+            python -m agent.main --dry-run
+          fi
 
       - name: Ollama server log
         if: always()
         run: tail -n 50 ollama.log || true
+
+      # Plain curl, so it still works when an earlier step (e.g. Python setup) failed.
+      - name: Report failure to Todoist
+        if: failure()
+        env:
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg content "Daily agent failed — $RUN_URL" \
+            '{content: $content, labels: ["gh-agent"], due_string: "today"}' > task.json
+          curl -fsS --retry 3 --retry-all-errors -m 30 -o /dev/null -w "Todoist: HTTP %{http_code}\n" \
+            -X POST https://api.todoist.com/api/v1/tasks \
+            -H "Authorization: Bearer $TODOIST_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "X-Request-Id: gh-agent-failure-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --data-binary @task.json
