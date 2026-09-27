@@ -24,8 +24,7 @@
 - **Pluggable providers** — swap to Claude API / Motion / Notion later via
   config, without rewriting orchestration.
 - **Dedupe via marker in task description** — avoids needing a database.
-- **Agent targets its own repo** — for testing/dogfooding until the real
-  target repo exists.
+- **Target switched to `arashzree/Regulars`** (2026-09-27, from dogfooding its own repo) for the T7 3-night live test.
 - **English output by default** (`output_language`: `en` | `fa`) — the
   first Persian runs read awkwardly (technical terms were translated, e.g.
   "client" became "customer"). The prompt now keeps technical terms as-is
