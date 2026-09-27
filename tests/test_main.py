@@ -49,7 +49,7 @@ class FakeProvider:
         return self.result
 
 
-SUMMARY = Summary(done=["افزودن کلاینت"], remaining=[RemainingItem(issue=1, title="نوشتن ماژول")])
+SUMMARY = Summary(done=["Add Todoist client"], remaining=[RemainingItem(issue=1, title="Write ai module")])
 
 
 def run(todoist: FakeTodoist, provider: FakeProvider, *, dry_run: bool, **github: Any) -> None:
@@ -63,9 +63,9 @@ def test_dry_run_prints_plan_and_writes_nothing(capsys: pytest.CaptureFixture[st
 
     out = capsys.readouterr().out
     assert "Plan: 2 action(s)" in out
-    assert "نوشتن ماژول (#1)" in out
-    # 04:00 UTC is 07:30 in Tehran, so "today" is the 27th.
-    assert "کارهای انجام‌شده 2026-09-27" in out
+    assert "Write ai module (#1)" in out
+    # 04:00 UTC is 07:30 in Tehran, so "today" is the 27th; the summary is due the 28th.
+    assert "Done on 2026-09-27  (due 2026-09-28)" in out
     assert todoist.writes == []
 
 

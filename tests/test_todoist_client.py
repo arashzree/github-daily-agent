@@ -162,18 +162,25 @@ def test_rule4_task_completed_in_todoist_is_not_recreated() -> None:
     assert build_plan(activity([1]), summary([1]), state(completed=completed), TODAY) == []
 
 
-def test_rule5_summary_created_once_per_day() -> None:
-    plan = build_plan(activity(), summary(done=["الف", "ب"]), state(), TODAY)
+def test_rule5_summary_created_once_per_day_due_tomorrow() -> None:
+    plan = build_plan(activity(), summary(done=["Add client", "Fix CI"]), state(), TODAY)
 
     assert len(plan) == 1
     action = plan[0]
-    assert action.content == "کارهای انجام‌شده 2026-09-27"
-    assert action.description == "- الف\n- ب\n\n[gh-agent:owner/repo:summary:2026-09-27]"
-    assert action.due == TODAY
+    # Title keeps the activity date; due tomorrow so it shows in the morning.
+    assert action.content == "Done on 2026-09-27"
+    assert action.description == "- Add client\n- Fix CI\n\n[gh-agent:owner/repo:summary:2026-09-27]"
+    assert action.due == TOMORROW
 
     marker = summary_marker(REPO, TODAY)
     for existing in (state([task("s", marker)]), state(completed=[task("s", marker)])):
         assert build_plan(activity(), summary(done=["الف"]), existing, TODAY) == []
+
+
+def test_rule5_summary_title_in_persian() -> None:
+    plan = build_plan(activity(), summary(done=["الف"]), state(), TODAY, "fa")
+    assert plan[0].content == "کارهای انجام‌شده 2026-09-27"
+    assert plan[0].marker == summary_marker(REPO, TODAY)
 
 
 def test_rule5_no_summary_when_done_empty() -> None:

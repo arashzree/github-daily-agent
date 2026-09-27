@@ -19,6 +19,7 @@ from typing import Any, Literal
 import requests
 from pydantic import BaseModel
 
+from agent.config import Language
 from agent.providers.base import Activity, Summary
 from agent.retry import send
 
@@ -30,6 +31,8 @@ PAGE_LIMIT = 200  # API maximum
 # The completed-tasks endpoint rejects ranges over 3 months.
 COMPLETED_LOOKBACK = timedelta(days=89)
 MARKER_RE = re.compile(r"\[gh-agent:[^\]]+\]")
+# Title of the daily summary task; {date} is the activity date.
+SUMMARY_TITLES: dict[Language, str] = {"en": "Done on {date}", "fa": "کارهای انجام‌شده {date}"}
 
 
 class TodoistError(RuntimeError):
@@ -182,14 +185,17 @@ class Action(BaseModel):
     task_id: str | None = None
 
 
-def build_plan(activity: Activity, summary: Summary, state: ProjectState, today: date) -> list[Action]:
+def build_plan(
+    activity: Activity, summary: Summary, state: ProjectState, today: date, language: Language = "en"
+) -> list[Action]:
     """Pure: decide what to write. Running it again after `execute` yields [].
 
     1. Open issue without an open task → create, due tomorrow.
     2. Open issue with an open task → roll its due date to tomorrow if earlier.
     3. Recently closed issue with an open task → close the task.
     4. Task completed in Todoist while the issue is still open → leave it.
-    5. Non-empty `done` and no summary task for today → create one.
+    5. Non-empty `done` and no summary task for today → create one, due tomorrow
+       so it shows up in the morning. Its title and marker keep today's date.
     """
     repo = activity.repo
     tomorrow = today + timedelta(days=1)
@@ -233,9 +239,9 @@ def build_plan(activity: Activity, summary: Summary, state: ProjectState, today:
             Action(
                 kind="create",
                 marker=marker,
-                content=f"کارهای انجام‌شده {today.isoformat()}",
+                content=SUMMARY_TITLES[language].format(date=today.isoformat()),
                 description=f"{bullets}\n\n{marker}",
-                due=today,
+                due=tomorrow,
             )
         )
     return plan

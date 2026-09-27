@@ -57,7 +57,7 @@ def run(
     summary = ai.summarize(provider, activity)
 
     today = now.astimezone(ZoneInfo(config.timezone)).date()
-    plan = build_plan(activity, summary, state, today)
+    plan = build_plan(activity, summary, state, today, config.output_language)
     print(format_plan(plan), flush=True)
 
     if dry_run:
