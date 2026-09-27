@@ -71,6 +71,45 @@ Body used:
 JSON to parse). After deleting both test tasks,
 `GET /tasks?project_id=...` returned `{"results": [], "next_cursor": null}`.
 
+### POST /tasks/{id} (update)
+
+Verified 2026-09-27. Body `{"due_date": "2026-09-28"}` → 200 with the
+full task. Creating with `due_date` (instead of `due_string`) also works
+and is what the client uses, since it's unambiguous.
+
+### POST /tasks/{id}/close
+
+Verified 2026-09-27. → `204`, empty body. The task disappears from
+`GET /tasks`.
+
+### GET /tasks/completed/by_completion_date
+
+Verified 2026-09-27. This is how the agent knows the user completed a task
+while its issue is still open (so it isn't recreated).
+
+```
+GET /api/v1/tasks/completed/by_completion_date
+    ?since=2026-09-20T00:00:00Z&until=2026-09-28T23:59:59Z&project_id=...&limit=200
+→ {"items": [{"id": ..., "content": "T4 spike", "description": "[gh-agent:spike#0]",
+              "checked": true, "completed_at": "2026-09-27T04:27:52.895147Z",
+              "due": {"date": "2026-09-28", ...}, "labels": ["gh-agent"], ...}]}
+```
+
+- Items are full task objects and `description` is included, so the
+  marker check works on completed tasks too.
+- The list is under `items`, not `results`. `next_cursor` was absent
+  when there was one page; the client treats missing and `null` the same.
+- **Range limit:** `since`→`until` must not exceed 3 months. A wider range
+  returns 400 `"completion date range must not exceed 3 months"`. The
+  client looks back 89 days.
+- `limit` max is 200 (201 → 400, `"threshold": 200`).
+- Also exists: `/tasks/completed/by_due_date` (same `{"items": [...]}`).
+  Not used.
+- Limitation: a task completed more than 89 days ago while its issue is
+  still open will be recreated. A task the user *deletes* (rather than
+  completes) is also recreated on the next run: deleted tasks aren't
+  listed anywhere.
+
 ### Persian / UTF-8
 
 `"content": "تست فارسی"` round-trips unchanged through POST and GET. The
