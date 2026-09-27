@@ -6,6 +6,6 @@
 - [x] T3 — ai module
 - [x] T4 — todoist_client + dedupe
 - [x] T5 — main + dry-run
-- [ ] T6 — Actions workflow + keepalive
+- [x] T6 — Actions workflow + keepalive
 - [ ] T7 — end-to-end test
-- [ ] T8 — README
+- [x] T8 — README
