@@ -166,7 +166,8 @@ API is used.
 ## Ollama (local, inside GitHub Actions) — CHOSEN
 
 Workflow: `.github/workflows/models-spike.yml` (manual trigger), script:
-`scripts/ollama_spike.py`.
+`scripts/ollama_spike.py`. Both were removed in T5 once `agent.yml`
+replaced them; see git history (commit `c6ee1a9`) for the originals.
 
 - Install: `curl -fsSL https://ollama.com/install.sh | sh` (~100–140 s
   on the runner). The spike stops the installer's systemd service and

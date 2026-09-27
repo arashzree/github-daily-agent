@@ -1,0 +1,49 @@
+name: agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the plan without writing to Todoist
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install agent
+        run: pip install -r requirements.txt -e .
+
+      # Setup proven in the T1 spike (docs/API_NOTES.md): run `ollama serve`
+      # ourselves and pull fresh every run (no cache).
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama || true
+          nohup ollama serve > ollama.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:11434/api/version && break; sleep 1; done
+
+      - name: Pull model
+        run: ollama pull "$(jq -r .ai_model config.json)"
+
+      - name: Run agent
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+        run: python -m agent.main ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Ollama server log
+        if: always()
+        run: tail -n 50 ollama.log || true
