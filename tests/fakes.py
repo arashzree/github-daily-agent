@@ -36,3 +36,48 @@ class FakeSession:
         if isinstance(result, Exception):
             raise result
         return result
+
+
+class FakeTodoist:
+    """In-memory Todoist with the TodoistClient methods the sync code uses."""
+
+    def __init__(self, project_id: str | None = "p1") -> None:
+        from agent.todoist_client import Task
+
+        self._task_cls = Task
+        self.project_id = project_id
+        self.open: list[Task] = []
+        self.completed: list[Task] = []
+        self.writes: list[str] = []
+
+    def find_project(self, name: str) -> str | None:
+        return self.project_id
+
+    def create_project(self, name: str) -> str:
+        self.writes.append(f"create_project {name}")
+        self.project_id = "p-new"
+        return self.project_id
+
+    def list_open_tasks(self, project_id: str) -> list[Any]:
+        return list(self.open)
+
+    def list_completed_tasks(self, project_id: str, since: Any, until: Any) -> list[Any]:
+        return list(self.completed)
+
+    def create_task(self, project_id: str, content: str, description: str, due: Any) -> Any:
+        self.writes.append(f"create {content}")
+        task = self._task_cls(id=f"t{len(self.writes)}", content=content, description=description, due_date=due)
+        self.open.append(task)
+        return task
+
+    def update_due(self, task_id: str, due: Any) -> None:
+        self.writes.append(f"update_due {task_id}")
+        for task in self.open:
+            if task.id == task_id:
+                task.due_date = due
+
+    def close_task(self, task_id: str) -> None:
+        self.writes.append(f"close {task_id}")
+        task = next(t for t in self.open if t.id == task_id)
+        self.open.remove(task)
+        self.completed.append(task)
