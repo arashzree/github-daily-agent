@@ -2,7 +2,7 @@
 
 - [x] T0 — Project setup
 - [x] T1 — API spikes (Todoist + LLM → local Ollama)
-- [ ] T2 — github_client
+- [x] T2 — github_client
 - [ ] T3 — ai module
 - [ ] T4 — todoist_client + dedupe
 - [ ] T5 — main + dry-run
